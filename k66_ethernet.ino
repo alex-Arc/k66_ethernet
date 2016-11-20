@@ -1,7 +1,7 @@
 #include "IPAddress.h"
 
 // set this to an unused IP number for your network
-IPAddress myaddress(192, 168, 194, 67);
+IPAddress myaddress(2, 2, 6, 10);
 
 #define MACADDR1 0x04E9E5
 #define MACADDR2 0x000001
@@ -23,6 +23,10 @@ typedef struct {
 	uint32_t unused1;
 	uint32_t unused2;
 } enetbufferdesc_t;
+
+typedef struct {
+  uint8_t header[8];
+} artPacket_t;
 
 #define RXSIZE 12
 #define TXSIZE 10
@@ -138,25 +142,81 @@ void loop()
 void incoming(void *packet, unsigned int len)
 {
 	const uint8_t *p8;
+  const uint8_t *b8;
 	const uint16_t *p16;
+  const uint16_t *b16;
 	const uint32_t *p32;
 	IPAddress src, dst;
 	uint16_t type;
+  
+  typedef struct S_ArtHeader {
+    uint8_t ID[8];                    // protocol ID = "Art-Net"
+    uint16_t OpCode;                  // == OpPoll
+  } T_ArtHeader;
 
+  typedef struct {
+    uint8_t   filler0[2];
+    uint8_t   dstMAC[6];
+    uint8_t   srcMAC[6];
+    uint16_t  type;
+    uint8_t   filler1[9];
+    uint8_t   protocol;
+    uint16_t  IPV4checksum;
+    IPAddress srcIP;
+    IPAddress dstIP;
+    T_ArtHeader header;
+  } artnetPacket_t;
+
+  artnetPacket_t *a;
+
+  a = (artnetPacket_t *)packet;
+  b8 = (const uint8_t *)packet;
+  p8 = (const uint8_t *)packet + 2;
+  b8 = (const uint8_t *)packet;
+  p16 = (const uint16_t *)p8;
+  b16 = (const uint16_t *)packet;
+  p32 = (const uint32_t *)packet;
+  
+  Serial.println();
+  printmac(a->dstMAC);
+  Serial.println();
+  printmac(a->srcMAC);
+  printhex(" type ", a->type);
+  printhex(" protocol = ", a->protocol);
+  print("srcIP = ", a->srcIP[0]);
+  print(".", a->srcIP[1]);
+  print(".", a->srcIP[2]);
+  print(".", a->srcIP[3]);
+  Serial.println();
+  print("dstIP = ", a->dstIP[0]);
+  print(".", a->dstIP[1]);
+  print(".", a->dstIP[2]);
+  print(".", a->dstIP[3]);
+  Serial.println();
+  
+  
 	Serial.println();
 	print("data, len=", len);
-	p8 = (const uint8_t *)packet + 2;
-	p16 = (const uint16_t *)p8;
-	p32 = (const uint32_t *)packet;
+	
 	type = p16[6];
-	if (type == 0x0008) {
+	if (type == 0x0008) {   // IPv4
 		src = p32[7];
 		dst = p32[8];
 		Serial.print("IPv4 Packet, src=");
 		Serial.print(src);
 		Serial.print(", dst=");
 		Serial.print(dst);
-		Serial.println();
+    if (p8[23] == 0x11) { //Udp Protocoll
+      Serial.print(", Udp=");
+      Serial.print( __builtin_bswap16(b16[19]));
+      if (__builtin_bswap16(b16[19]) == 6454) {
+        printhex("  is artnet? ", b8[44]);
+/*        if(memcmp(b8[44], "Art-Net", 8)) {
+          Serial.print("yes");
+        }*/
+      }
+    }
+    printhex(",  protocol", p8[23]);
 		printpacket(p8, len - 2);
 		if (p8[23] == 1 && dst == myaddress) {
 			Serial.println("  Protocol is ICMP:");
@@ -169,7 +229,7 @@ void incoming(void *packet, unsigned int len)
 				ping_reply((uint32_t *)packet, len);
 			}
 		}
-	} else if (type == 0x0608) {
+	} else if (type == 0x0608) {    //Address Resolution Protocol 
 		Serial.println("ARP Packet:");
 		printpacket(p8, len - 2);
 		if (p32[4] == 0x00080100 && p32[5] == 0x01000406) {
@@ -300,13 +360,13 @@ void mdio_write(int phyaddr, int regaddr, uint16_t data)
 
 void print(const char *s)
 {
-	Serial.println(s);
+	Serial.print(s);
 }
 
 void print(const char *s, int num)
 {
 	Serial.print(s);
-	Serial.println(num);
+	Serial.print(num);
 }
 
 void printhex(const char *s, int num)
