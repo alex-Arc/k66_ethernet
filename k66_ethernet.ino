@@ -1,10 +1,75 @@
 #include "IPAddress.h"
+#include "EtherType.h"
+#include "IPprotocol.h"
+
+//static const int IPv4 = 0x0008;     //byte swap Internet Protocol version 4
+//static const int ARP = 0x0608;   //Address Resolution Protocol
 
 // set this to an unused IP number for your network
 IPAddress myaddress(2, 2, 6, 10);
 
+enum EtherType: uint16_t {
+  IPv4  = 0x0008,
+  ARP   = 0x0608
+};
+
+typedef struct S_EthernetHeader {
+  uint16_t   pad;
+  uint8_t   dstMAC[6];
+  uint8_t   srcMAC[6];
+  uint16_t  type;
+} T_EthernetHeader;
+
+typedef struct S_IPv4Header {
+  //T_EthernetHeader  ethernetHeader;
+  uint8_t           Verion_IHL;          //bit 0-3: Version  bit 4-7: Internet Header Length (IHL)
+  uint8_t           DSCP_ECN;
+  uint16_t          totalLength;
+  uint16_t          ID;
+  uint16_t          Flags_FragmentOffset;
+  uint8_t           TTL;
+  uint8_t           protocol;
+  uint16_t          headerChecksum;
+  uint8_t           srcIP[4];
+  uint8_t           dstIP[4];
+  uint32_t          options[4];
+} T_IPv4Header;
+
+typedef struct S_arp{
+  uint16_t  HTYPE;    //Hardware type
+  uint16_t  PTYPE;    //Protocol type
+  uint8_t   HLEN;     //Hardware length. lenght hardware address is 6
+  uint8_t   PLEN;     //Protocol length. length of IPv4 addr is 4
+  uint16_t  OPER;     //Operation 1 for request, 2 for reply
+  uint8_t   SHA[6];   //sender hardware address (MAC)
+  uint8_t   SPA[4];   //Sender protocol address (IP)
+  uint8_t   THA[6];    //Target hardware address (MAC)
+  uint8_t   TPA[4];    //Target protocol address (IP)
+}T_arp;
+
+typedef struct S_UDPHeader {
+  uint16_t          srcPort;
+  uint16_t          dstPort;
+  uint16_t          length;
+  uint16_t          checksum;
+} T_UDPHeader;
+
 #define MACADDR1 0x04E9E5
 #define MACADDR2 0x000001
+
+const uint8_t MACADDR[6] = {0x04,
+                            0xE9,
+                            0xE5,
+                            0x00,
+                            0x00,
+                            0x01};
+
+const uint8_t BoardCastMACADDR[6] =  {0xFF,
+                                      0xFF,
+                                      0xFF,
+                                      0xFF,
+                                      0xFF,
+                                      0xFF};
 
 // This test program prints a *lot* of info to the Arduino Serial Monitor
 // Ping response time is approx 1.3 ms with 180 MHz clock, due to all the
@@ -13,7 +78,14 @@ IPAddress myaddress(2, 2, 6, 10);
 
 typedef struct {
 	uint16_t length;
-	uint16_t flags;
+  union {
+	  uint16_t flags;
+    uint16_t test;
+    struct {
+        uint8_t tet1;
+        uint8_t tet2;
+      } flag;
+  };
 	void *buffer;
 	uint32_t moreflags;
 	uint16_t checksum;
@@ -69,7 +141,7 @@ void setup()
 	//		1461	transmit buffer descriptor
 
 	print("enetbufferdesc_t size = ", sizeof(enetbufferdesc_t));
-	print("rx_ring size = ", sizeof(rx_ring));
+	print("\n rx_ring size = ", sizeof(rx_ring));
 	memset(rx_ring, 0, sizeof(rx_ring));
 	memset(tx_ring, 0, sizeof(tx_ring));
 
@@ -102,14 +174,14 @@ void setup()
 	ENET_MRBR = 512;
 	ENET_TACC = ENET_TACC_SHIFT16;
 	//ENET_TACC = ENET_TACC_SHIFT16 | ENET_TACC_IPCHK | ENET_TACC_PROCHK;
-	ENET_RACC = ENET_RACC_SHIFT16;
+	ENET_RACC = ENET_RACC_SHIFT16 | ENET_RACC_PADREM;
 
 	ENET_ECR = 0xF0000000 | ENET_ECR_DBSWP | ENET_ECR_EN1588 | ENET_ECR_ETHEREN;
 	ENET_RDAR = ENET_RDAR_RDAR;
 	ENET_TDAR = ENET_TDAR_TDAR;
 
-	printhex("MDIO PHY ID2 (LAN8720A should be 0007): ", mdio_read(0, 2));
-	printhex("MDIO PHY ID3 (LAN8720A should be C0F?): ", mdio_read(0, 3));
+	printhex("\n MDIO PHY ID2 (LAN8720A should be 0007): ", mdio_read(0, 2));
+	printhex("\n MDIO PHY ID3 (LAN8720A should be C0F?): ", mdio_read(0, 3));
 }
 
 // watch for data to arrive
@@ -120,8 +192,47 @@ void loop()
 
 	buf = rx_ring + rxnum;
 
+
 	if ((buf->flags & 0x8000) == 0) {
-		incoming(buf->buffer, buf->length);
+    Serial.println("--------------------------------------------");
+    if(bitRead(buf->flags,15)){
+      Serial.println("empty");
+    }
+    if(bitRead(buf->flags,0)){
+      Serial.println("frame is truncated ignor all");
+    }
+    if(bitRead(buf->flags,11)){
+      Serial.println("last frame");
+      if (bitRead(buf->flags,5)) {
+        Serial.println("Receive frame length violation");
+      }
+      if (bitRead(buf->moreflags,5)) {
+        Serial.println("IP  checksum error");
+      }
+      if (bitRead(buf->moreflags,5)) {
+        Serial.println("Protocol  checksum error");
+      }
+      /*if (bitRead(buf->moreflags,1)) {
+      Serial.println("Overrun FIFO");
+      }*/
+    }
+    if(bitRead(buf->flags,8)){
+      Serial.println("MAC miss");
+    }
+    if(bitRead(buf->flags,7)){
+      Serial.println("MAC brordcast");
+    }else if(bitRead(buf->flags,7)){
+      Serial.println("MAC multicast");
+    }
+    if(bitRead(buf->flags,4)){
+      Serial.println("non-octet aligned frame");
+    }
+    if(bitRead(buf->flags,2)){
+      Serial.println(" CRC or frame error");
+    }
+    Serial.println(buf->moreflags, BIN);
+
+    incoming(buf->buffer, buf->length, buf->flags);
 		if (rxnum < RXSIZE-1) {
 			buf->flags = 0x8000;
 			rxnum++;
@@ -139,7 +250,7 @@ void loop()
 }
 
 // when we get data, try to parse it
-void incoming(void *packet, unsigned int len)
+void incoming(void *packet, unsigned int len, uint16_t flags)
 {
 	const uint8_t *p8;
   const uint8_t *b8;
@@ -148,11 +259,109 @@ void incoming(void *packet, unsigned int len)
 	const uint32_t *p32;
 	IPAddress src, dst;
 	uint16_t type;
-  
-  typedef struct S_ArtHeader {
-    uint8_t ID[8];                    // protocol ID = "Art-Net"
-    uint16_t OpCode;                  // == OpPoll
-  } T_ArtHeader;
+
+
+
+  T_EthernetHeader *ethernetHeader;
+  ethernetHeader = (T_EthernetHeader*)packet;
+
+  Serial.println();
+  print("dstMAC: ");
+  printmac(ethernetHeader->dstMAC);
+  Serial.println();
+  print("srcMAC: ");
+  printmac(ethernetHeader->srcMAC);
+  Serial.println();
+  // Serial.print(ethernetHeader->type);
+  if (1 == 1) {
+    print("EtherType: ");
+    p8 = (const uint8_t*)packet + sizeof(T_EthernetHeader);
+    switch(ethernetHeader->type) {
+      case EtherType::IPv4:
+        print("IPv4 \n");
+        T_IPv4Header *IPv4Header;
+        IPv4Header = (T_IPv4Header*)p8;
+        print("version: ", IPv4Header->Verion_IHL>>4);
+        print("\n len: ", IPv4Header->Verion_IHL & 0x0F);
+
+        print("\n srcIP = ", IPv4Header->srcIP[0]);
+        print(".", IPv4Header->srcIP[1]);
+        print(".", IPv4Header->srcIP[2]);
+        print(".", IPv4Header->srcIP[3]);
+        Serial.println();
+
+        print("dstIP = ", IPv4Header->dstIP[0]);
+        print(".", IPv4Header->dstIP[1]);
+        print(".", IPv4Header->dstIP[2]);
+        print(".", IPv4Header->dstIP[3]);
+        Serial.println();
+
+        if(1 == 1) {
+          p8 = (const uint8_t*)IPv4Header + (IPv4Header->Verion_IHL & 0x0F)*4;
+          switch(IPv4Header->protocol) {
+            case UDP:
+              print("UDP \n");
+              T_UDPHeader *UDPHeader;
+              // p8 = (const uint8_t*)IPv4Header + (IPv4Header->Verion_IHL & 0x0F)*4;
+              UDPHeader = (T_UDPHeader *)p8;
+              print("srcPort: ", __builtin_bswap16(UDPHeader->srcPort));
+              print("\n dstPort: ", __builtin_bswap16(UDPHeader->dstPort));
+              print("\n len: ", UDPHeader->length);
+            break;
+
+            default:
+              print("unknown");
+            break;
+          }
+        }else {
+          print("to someone else");
+        }
+      break;
+
+      case EtherType::ARP:
+        print("ARP \n");
+        const T_arp *ARPpacket;
+        ARPpacket = (const T_arp *)p8;
+
+        if(ARPpacket->HTYPE == 0x0100 && ARPpacket->PTYPE == EtherType::IPv4) {
+          if(ARPpacket->OPER == 0x0100) {
+            print("ARP request");
+            Serial.print("  Who is ");
+            Serial.print(IPAddress(ARPpacket->TPA));
+            Serial.print("Tell ");
+            Serial.print(IPAddress(ARPpacket->SPA));
+
+          }else if(ARPpacket->OPER == 0x0200) {
+            print("ARP reply");
+          }
+        }else{print("error");}
+  		  /*  if (p32[4] == 0x00080100 && p32[5] == 0x01000406) {
+  			// request is for IPv4 address of ethernet mac
+  			IPAddress from((p16[15] << 16) | p16[14]);
+  			IPAddress to(p32[10]);
+  			Serial.print("  Who is ");
+  			Serial.print(to);
+  			Serial.print(" from ");
+  			Serial.print(from);
+  			Serial.print(" (");
+  			printmac(p8 + 22);
+  			Serial.println(")");
+  			if (to == myaddress) {
+  				arp_reply(p8+22, from);
+        }
+        }*/
+      break;
+
+      default:
+        print("unknown");
+      break;
+      }
+    }else {
+      print("to some one else");
+    }
+
+
+
 
   typedef struct {
     uint8_t   filler0[2];
@@ -164,7 +373,7 @@ void incoming(void *packet, unsigned int len)
     uint16_t  IPV4checksum;
     IPAddress srcIP;
     IPAddress dstIP;
-    T_ArtHeader header;
+
   } artnetPacket_t;
 
   artnetPacket_t *a;
@@ -176,10 +385,12 @@ void incoming(void *packet, unsigned int len)
   p16 = (const uint16_t *)p8;
   b16 = (const uint16_t *)packet;
   p32 = (const uint32_t *)packet;
-  
+  /*
   Serial.println();
+  print("dstMAC: ");
   printmac(a->dstMAC);
   Serial.println();
+  print("dstMAC: ");
   printmac(a->srcMAC);
   printhex(" type ", a->type);
   printhex(" protocol = ", a->protocol);
@@ -193,11 +404,12 @@ void incoming(void *packet, unsigned int len)
   print(".", a->dstIP[2]);
   print(".", a->dstIP[3]);
   Serial.println();
-  
-  
+  */
+
+
 	Serial.println();
 	print("data, len=", len);
-	
+
 	type = p16[6];
 	if (type == 0x0008) {   // IPv4
 		src = p32[7];
@@ -229,53 +441,64 @@ void incoming(void *packet, unsigned int len)
 				ping_reply((uint32_t *)packet, len);
 			}
 		}
-	} else if (type == 0x0608) {    //Address Resolution Protocol 
-		Serial.println("ARP Packet:");
-		printpacket(p8, len - 2);
-		if (p32[4] == 0x00080100 && p32[5] == 0x01000406) {
-			// request is for IPv4 address of ethernet mac
-			IPAddress from((p16[15] << 16) | p16[14]);
-			IPAddress to(p32[10]);
-			Serial.print("  Who is ");
-			Serial.print(to);
-			Serial.print(" from ");
-			Serial.print(from);
-			Serial.print(" (");
-			printmac(p8 + 22);
-			Serial.println(")");
-			if (to == myaddress) {
-				arp_reply(p8+22, from);
-			}
-		}
+	} else if (type == 0x0608) {    //Address Resolution Protocol
+		 Serial.println("ARP Packet:");
+		 printpacket(p8, len - 2);
+		// if (p32[4] == 0x00080100 && p32[5] == 0x01000406) {
+		// 	// request is for IPv4 address of ethernet mac
+		// 	IPAddress from((p16[15] << 16) | p16[14]);
+		// 	IPAddress to(p32[10]);
+		// 	Serial.print("  Who is ");
+		// 	Serial.print(to);
+		// 	Serial.print(" from ");
+		// 	Serial.print(from);
+		// 	Serial.print(" (");
+		// 	printmac(p8 + 22);
+		// 	Serial.println(")");
+		// 	if (to == myaddress) {
+		// 		arp_reply(p8+22, from);
+		//	}
+		//}
 	}
 }
 
 // compose an answer to ARP requests
 void arp_reply(const uint8_t *mac, IPAddress &ip)
 {
-	uint32_t packet[11]; // 42 bytes needed + 2 pad
-	uint8_t *p = (uint8_t *)packet + 2;
+  uint8_t arp_length = sizeof(T_EthernetHeader)+sizeof(T_arp);
+	uint8_t packet[arp_length]; // 42 bytes needed + 2 pad
+  const uint8_t *p8;
+  p8 = (const uint8_t*)packet;
 
-	packet[0] = 0;       // first 2 bytes are padding
-	memcpy(p, mac, 6);
-	memset(p + 6, 0, 6); // hardware automatically adds our mac addr
-	//p[6] = (MACADDR1 >> 16) & 255;
-	//p[7] = (MACADDR1 >> 8) & 255;
-	//p[8] = (MACADDR1) & 255;
-	//p[9] = (MACADDR2 >> 16) & 255; // this is how to do it the hard way
-	//p[10] = (MACADDR2 >> 8) & 255;
-	//p[11] = (MACADDR2) & 255;
-	p[12] = 8;
-	p[13] = 6;  // arp protocol
-	packet[4] = 0x00080100; // IPv4 on ethernet
-	packet[5] = 0x02000406; // reply, ip 4 byte, macaddr 6 bytes
-	packet[6] = (__builtin_bswap32(MACADDR1) >> 8) | ((MACADDR2 << 8) & 0xFF000000);
-	packet[7] = __builtin_bswap16(MACADDR2 & 0xFFFF) | ((uint32_t)myaddress << 16);
+   if(true) {
+  	T_EthernetHeader *ptr = (T_EthernetHeader *)p8;
+  	ptr->pad = 0;       // first 2 bytes are padding
+  	memcpy(ptr->dstMAC, mac, 6);
+  	memset(ptr->srcMAC, 0, 6); // hardware automatically adds our mac addr
+  	//p[6] = (MACADDR1 >> 16) & 255;
+  	//p[7] = (MACADDR1 >> 8) & 255;
+  	//p[8] = (MACADDR1) & 255;
+  	//p[9] = (MACADDR2 >> 16) & 255; // this is how to do it the hard way
+  	//p[10] = (MACADDR2 >> 8) & 255;
+  	//p[11] = (MACADDR2) & 255;
+    ptr->type = ARP;
+   }
+  p8 = (const uint8_t*)packet+sizeof(T_EthernetHeader);
+  if(true) {
+    T_arp *ptr = (T_arp *)p8;
+    ptr->HTYPE = 1;             //ethernet
+    ptr->PTYPE = 0x0800;        //IPv4
+    ptr->HLEN = 6;
+    ptr->PLEN = 4;
+    ptr->OPER = 2;  //1 for request, 2 for reply.
+    memcpy(ptr->SHA, MACADDR, 6);
+  }
+
 	packet[8] = (((uint32_t)myaddress & 0xFFFF0000) >> 16) | (mac[0] << 16) | (mac[1] << 24);
 	packet[9] = (mac[5] << 24) | (mac[4] << 16) | (mac[3] << 8) | mac[2];
 	packet[10] = (uint32_t)ip;
 	Serial.println("ARP Reply:");
-	printpacket(p, 42);
+	printpacket(packet, 42);
 	outgoing(packet, 44);
 }
 
@@ -393,5 +616,3 @@ void printpacket(const uint8_t *data, unsigned int len)
 	Serial.println();
 #endif
 }
-
-
