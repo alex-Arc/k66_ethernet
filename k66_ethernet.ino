@@ -410,27 +410,10 @@ void incoming(void *packet, unsigned int len, uint16_t flags)
 
 // compose an answer to ARP requests
 void arp_reply(const uint8_t *mac, const uint8_t *ip) {
-  uint8_t arp_length = sizeof(T_EthernetHeader)+sizeof(T_arp);
-	uint8_t packet[arp_length]; // 42 bytes needed + 2 pad
-  const uint8_t *p8;
-  p8 = (const uint8_t*)packet;
+  void *packet = calloc(1, sizeof(T_arp));
 
-  if(true) {
-    T_EthernetHeader *ptr = (T_EthernetHeader *)p8;
-    ptr->pad = 0;       // first 2 bytes are padding
-    memcpy(ptr->dstMAC, (uint8_t*)mac, 6);
-    //memset(ptr->srcMAC, 0, 6); // hardware automatically adds our mac addr
-    //p[6] = (MACADDR1 >> 16) & 255;
-    //p[7] = (MACADDR1 >> 8) & 255;
-    //p[8] = (MACADDR1) & 255;
-    //p[9] = (MACADDR2 >> 16) & 255; // this is how to do it the hard way
-    //p[10] = (MACADDR2 >> 8) & 255;
-    //p[11] = (MACADDR2) & 255;
-    ptr->type = ARP;
-  }
-  p8 = (const uint8_t*)packet+sizeof(T_EthernetHeader);
-  if(true) {
-    T_arp *ptr = (T_arp *)p8;
+
+    T_arp *ptr = (T_arp *)packet;
     ptr->HTYPE = 0x0100;             //ethernet
     ptr->PTYPE = IPv4;            //IPv4
     ptr->HLEN = 6;
@@ -440,10 +423,35 @@ void arp_reply(const uint8_t *mac, const uint8_t *ip) {
     memcpy(ptr->SPA, myaddress_byte, 4);
     memcpy(ptr->THA, mac, 6);
     memcpy(ptr->TPA, ip, 4);
-  }
+
 	Serial.println("ARP Reply:");
-	printpacket(packet, 42);
-	outgoing(packet, 44);
+
+	outgoing_pre(packet, sizeof(T_arp), mac, EtherType::ARP);
+}
+void outgoing_pre(void *packet, unsigned int len, const uint8_t* dstMAC, uint16_t EtherType) {
+
+	static int txnum=0;
+	volatile enetbufferdesc_t *buf;
+	uint16_t flags;
+
+	buf = tx_ring + txnum;
+	flags = buf->flags.all;
+	if ((flags & 0x8000) == 0) {
+		print("tx, num=", txnum);
+    T_EthernetHeader *ptr = (T_EthernetHeader *)buf->buffer;
+    ptr->pad = 0;       // first 2 bytes are padding
+    ptr->type = EtherType;
+		buf->length = len+sizeof(T_EthernetHeader);
+    memcpy(ptr->dstMAC, dstMAC, 6);
+		memcpy(buf->buffer+sizeof(T_EthernetHeader), packet, len);
+		buf->flags.all = flags | 0x8C00;
+		ENET_TDAR = ENET_TDAR_TDAR;
+		if (txnum < TXSIZE-1) {
+			txnum++;
+		} else {
+			txnum = 0;
+		}
+	}
 }
 
 // compose an reply to pings
