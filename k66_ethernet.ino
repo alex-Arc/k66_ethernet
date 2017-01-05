@@ -7,6 +7,7 @@
 
 // set this to an unused IP number for your network
 IPAddress myaddress(2, 2, 6, 10);
+uint8_t myaddress_byte[4] = {2,2,6,10};
 
 enum EtherType: uint16_t {
   IPv4  = 0x0008,
@@ -273,7 +274,8 @@ void incoming(void *packet, unsigned int len, uint16_t flags)
             Serial.print(IPAddress(ARPpacket->SPA));
             if(IPAddress(ARPpacket->TPA) == myaddress) {
               Serial.println("\n i am, sending reply.. ");
-              //arp_reply(ARPpacket->TPA, IPAddress(ARPpacket->SPA));
+              IPAddress from(ARPpacket->SPA);
+              arp_reply(ARPpacket->SHA, ARPpacket->SPA);
             }
           }else if(ARPpacket->OPER == 0x0200) {
             print("ARP reply");
@@ -407,43 +409,38 @@ void incoming(void *packet, unsigned int len, uint16_t flags)
 }
 
 // compose an answer to ARP requests
-void arp_reply(const uint8_t *mac, IPAddress &ip) {
+void arp_reply(const uint8_t *mac, const uint8_t *ip) {
   uint8_t arp_length = sizeof(T_EthernetHeader)+sizeof(T_arp);
 	uint8_t packet[arp_length]; // 42 bytes needed + 2 pad
   const uint8_t *p8;
   p8 = (const uint8_t*)packet;
 
-   if(true) {
-  	T_EthernetHeader *ptr = (T_EthernetHeader *)p8;
-  	ptr->pad = 0;       // first 2 bytes are padding
-  	memcpy(ptr->dstMAC, (uint8_t*)mac, 6);
-  	//memset(ptr->srcMAC, 0, 6); // hardware automatically adds our mac addr
-  	//p[6] = (MACADDR1 >> 16) & 255;
-  	//p[7] = (MACADDR1 >> 8) & 255;
-  	//p[8] = (MACADDR1) & 255;
-  	//p[9] = (MACADDR2 >> 16) & 255; // this is how to do it the hard way
-  	//p[10] = (MACADDR2 >> 8) & 255;
-  	//p[11] = (MACADDR2) & 255;
+  if(true) {
+    T_EthernetHeader *ptr = (T_EthernetHeader *)p8;
+    ptr->pad = 0;       // first 2 bytes are padding
+    memcpy(ptr->dstMAC, (uint8_t*)mac, 6);
+    //memset(ptr->srcMAC, 0, 6); // hardware automatically adds our mac addr
+    //p[6] = (MACADDR1 >> 16) & 255;
+    //p[7] = (MACADDR1 >> 8) & 255;
+    //p[8] = (MACADDR1) & 255;
+    //p[9] = (MACADDR2 >> 16) & 255; // this is how to do it the hard way
+    //p[10] = (MACADDR2 >> 8) & 255;
+    //p[11] = (MACADDR2) & 255;
     ptr->type = ARP;
-   }
+  }
   p8 = (const uint8_t*)packet+sizeof(T_EthernetHeader);
   if(true) {
     T_arp *ptr = (T_arp *)p8;
     ptr->HTYPE = 0x0100;             //ethernet
-    ptr->PTYPE = 0x0800;            //IPv4
+    ptr->PTYPE = IPv4;            //IPv4
     ptr->HLEN = 6;
     ptr->PLEN = 4;
     ptr->OPER = 0x0200;  //1 for request, 2 for reply.
-    //memcpy((uint8_t*)ptr->SHA, IPAddress(myaddress), 6);
-    // memcpy(ptr->SPA, MACADDR, 6);
-    //memcpy(ptr->THA, (uint8_t*)mac, 6);
-    //memcpy(ptr->TPA, (uint8_t*)ip, 6);
-
+    memcpy(ptr->SHA, MACADDR, 6);
+    memcpy(ptr->SPA, myaddress_byte, 4);
+    memcpy(ptr->THA, mac, 6);
+    memcpy(ptr->TPA, ip, 4);
   }
-
-/*	packet[8] = (((uint32_t)myaddress & 0xFFFF0000) >> 16) | (mac[0] << 16) | (mac[1] << 24);
-	packet[9] = (mac[5] << 24) | (mac[4] << 16) | (mac[3] << 8) | mac[2];
-	packet[10] = (uint32_t)ip;*/
 	Serial.println("ARP Reply:");
 	printpacket(packet, 42);
 	outgoing(packet, 44);
