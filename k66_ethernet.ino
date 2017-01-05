@@ -44,13 +44,8 @@ static enetbufferdesc_t tx_ring[TXSIZE] __attribute__ ((aligned(16)));
 uint32_t rxbufs[RXSIZE*128] __attribute__ ((aligned(16)));
 uint32_t txbufs[TXSIZE*128] __attribute__ ((aligned(16)));
 
-// initialize the ethernet hardware
-void setup()
-{
-	while (!Serial) ; // wait
-	print("Ethernet Testing");
-	print("----------------\n");
-	MPU_RGDAAC0 |= 0x007C0000;
+void begin() {
+  MPU_RGDAAC0 |= 0x007C0000;
 	SIM_SCGC2 |= SIM_SCGC2_ENET;
 	CORE_PIN3_CONFIG =  PORT_PCR_MUX(4); // RXD1
 	CORE_PIN4_CONFIG =  PORT_PCR_MUX(4); // RXD0
@@ -82,15 +77,15 @@ void setup()
 	memset(rx_ring, 0, sizeof(rx_ring));
 	memset(tx_ring, 0, sizeof(tx_ring));
 
-	for (int i=0; i < RXSIZE; i++) {
-		rx_ring[i].flags = 0x8000; // empty flag
+  for (int i=0; i < RXSIZE; i++) {
+		rx_ring[i].flags.all = 0x8000; // empty flag
 		rx_ring[i].buffer = rxbufs + i * 128;
 	}
-	rx_ring[RXSIZE-1].flags = 0xA000; // empty & wrap flags
+	rx_ring[RXSIZE-1].flags.all = 0xA000; // empty & wrap flags
 	for (int i=0; i < TXSIZE; i++) {
 		tx_ring[i].buffer = txbufs + i * 128;
 	}
-	tx_ring[TXSIZE-1].flags = 0x2000; // wrap flag
+	tx_ring[TXSIZE-1].flags.all = 0x2000; // wrap flag
 
 	ENET_EIMR = 0;
 	ENET_MSCR = ENET_MSCR_MII_SPEED(15);  // 12 is fastest which seems to work
@@ -116,6 +111,15 @@ void setup()
 	ENET_ECR = 0xF0000000 | ENET_ECR_DBSWP | ENET_ECR_EN1588 | ENET_ECR_ETHEREN;
 	ENET_RDAR = ENET_RDAR_RDAR;
 	ENET_TDAR = ENET_TDAR_TDAR;
+}
+
+// initialize the ethernet hardware
+void setup()
+{
+	while (!Serial) ; // wait
+	print("Ethernet Testing");
+	print("----------------\n");
+	begin();
 
 	printhex("\n MDIO PHY ID2 (LAN8720A should be 0007): ", mdio_read(0, 2));
 	printhex("\n MDIO PHY ID3 (LAN8720A should be C0F?): ", mdio_read(0, 3));
@@ -130,17 +134,17 @@ void loop()
 	buf = rx_ring + rxnum;
 
 
-	if ((buf->flags & 0x8000) == 0) {
+	if ((buf->flags.all & 0x8000) == 0) {
     Serial.println("--------------------------------------------");
-    if(bitRead(buf->flags,15)){
+    if(bitRead(buf->flags.all,15)){
       Serial.println("empty");
     }
-    if(bitRead(buf->flags,0)){
+    if(bitRead(buf->flags.all,0)){
       Serial.println("frame is truncated ignor all");
     }
-    if(bitRead(buf->flags,11)){
+    if(bitRead(buf->flags.all,11)){
       Serial.println("last frame");
-      if (bitRead(buf->flags,5)) {
+      if (bitRead(buf->flags.all,5)) {
         Serial.println("Receive frame length violation");
       }
       if (bitRead(buf->moreflags,5)) {
@@ -153,28 +157,28 @@ void loop()
       Serial.println("Overrun FIFO");
       }*/
     }
-    if(bitRead(buf->flags,8)){
+    if(bitRead(buf->flags.all,8)){
       Serial.println("MAC miss");
     }
-    if(bitRead(buf->flags,7)){
+    if(bitRead(buf->flags.all,7)){
       Serial.println("MAC brordcast");
-    }else if(bitRead(buf->flags,7)){
+    }else if(bitRead(buf->flags.all,7)){
       Serial.println("MAC multicast");
     }
-    if(bitRead(buf->flags,4)){
+    if(bitRead(buf->flags.all,4)){
       Serial.println("non-octet aligned frame");
     }
-    if(bitRead(buf->flags,2)){
+    if(bitRead(buf->flags.all,2)){
       Serial.println(" CRC or frame error");
     }
     Serial.println(buf->moreflags, BIN);
 
-    incoming(buf->buffer, buf->length, buf->flags);
+    incoming(buf->buffer, buf->length, buf->flags.all);
 		if (rxnum < RXSIZE-1) {
-			buf->flags = 0x8000;
+			buf->flags.all = 0x8000;
 			rxnum++;
 		} else {
-			buf->flags = 0xA000;
+			buf->flags.all = 0xA000;
 			rxnum = 0;
 		}
 	}
@@ -472,12 +476,12 @@ void outgoing(void *packet, unsigned int len)
 	uint16_t flags;
 
 	buf = tx_ring + txnum;
-	flags = buf->flags;
+	flags = buf->flags.all;
 	if ((flags & 0x8000) == 0) {
 		print("tx, num=", txnum);
 		buf->length = len;
 		memcpy(buf->buffer, packet, len);
-		buf->flags = flags | 0x8C00;
+		buf->flags.all = flags | 0x8C00;
 		ENET_TDAR = ENET_TDAR_TDAR;
 		if (txnum < TXSIZE-1) {
 			txnum++;

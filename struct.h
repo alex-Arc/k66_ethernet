@@ -44,7 +44,26 @@ typedef struct S_UDPHeader {
 
 typedef struct {
 	uint16_t length;
-	uint16_t flags;
+  union {
+    uint16_t all;
+    struct {
+      uint16_t E     : 1;
+      uint16_t RO1   : 1;  //Receive software ownership. This field is reserved for use by software. This read/write field is not modified by hardware, nor does its value affect hardware.
+      uint16_t W     : 1;  //Warp
+      uint16_t RO2   : 1;
+      uint16_t L     : 1;  //last frame
+      uint16_t res2  : 2;  //Reserved
+      uint16_t M     : 1;  //This field is valid only if the L and PROM bits are set. 0 The frame was received because of an address recognition hit. 1 The frame was received because of promiscuous mode.
+      uint16_t BC    : 1;  //Set if the DA is broadcast (FFFF_FFFF_FFFF).
+      uint16_t MC    : 1;  //Set if the DA is multicast and not BC.
+      uint16_t LG    : 1;  //This field is valid only if the L field is set. A frame length greater than RCR[MAX_FL] was recognized.
+      uint16_t NO    : 1;  //This field is valid only if the L field is set. Receive non-octet aligned frame
+      uint16_t res1  : 1;  //Reserved
+      uint16_t CR    : 1;  //This field is valid only if the L field is set. Receive CRC or frame error.
+      uint16_t OV    : 1;  //This field is valid only if the L field is set. A receive FIFO overrun occurred
+      uint16_t TR    : 1;  //frame must be discarded. Set if the receive frame is truncated (frame length >TRUNC_FL).
+    };
+  }flags;
 	void *buffer;
 	uint32_t moreflags;
 	uint16_t checksum;
