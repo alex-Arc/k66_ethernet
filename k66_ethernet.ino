@@ -135,46 +135,17 @@ void loop()
 	buf = rx_ring + rxnum;
 
 
-	if ((buf->flags.all & 0x8000) == 0) {
-    Serial.println("--------------------------------------------");
-    if(bitRead(buf->flags.all,15)){
-      Serial.println("empty");
-    }
-    if(bitRead(buf->flags.all,0)){
-      Serial.println("frame is truncated ignor all");
-    }
-    if(bitRead(buf->flags.all,11)){
-      Serial.println("last frame");
-      if (bitRead(buf->flags.all,5)) {
-        Serial.println("Receive frame length violation");
-      }
-      if (bitRead(buf->moreflags,5)) {
-        Serial.println("IP  checksum error");
-      }
-      if (bitRead(buf->moreflags,5)) {
-        Serial.println("Protocol  checksum error");
-      }
-      /*if (bitRead(buf->moreflags,1)) {
-      Serial.println("Overrun FIFO");
-      }*/
-    }
-    if(bitRead(buf->flags.all,8)){
-      Serial.println("MAC miss");
-    }
-    if(bitRead(buf->flags.all,7)){
-      Serial.println("MAC brordcast");
-    }else if(bitRead(buf->flags.all,7)){
-      Serial.println("MAC multicast");
-    }
-    if(bitRead(buf->flags.all,4)){
-      Serial.println("non-octet aligned frame");
-    }
-    if(bitRead(buf->flags.all,2)){
-      Serial.println(" CRC or frame error");
-    }
-    Serial.println(buf->moreflags, BIN);
-
-    incoming(buf->buffer, buf->length, buf->flags.all);
+	if (buf->flags.E == 0) {
+    if (buf->flags.TR == 0) {
+      Serial.println("--------------------------------------------");
+      Serial.println(buf->protocolType);
+      Serial.println(buf->moreflags.all, BIN);
+      if (buf->flags.L == 1) {
+        if (buf->flags.MC == 1 || buf->flags.BC == 1 || buf->flags.M == 0) {
+          incoming(buf->buffer, buf->length, buf->flags.all);
+        }else{Serial.print("mac miss");}
+      }else{Serial.println("can't handel multiframe right now");}
+    }else{Serial.println("ERROR");}
 		if (rxnum < RXSIZE-1) {
 			buf->flags.all = 0x8000;
 			rxnum++;
@@ -387,24 +358,6 @@ void incoming(void *packet, unsigned int len, uint16_t flags)
 				ping_reply((uint32_t *)packet, len);
 			}
 		}
-	} else if (type == 0x0608) {    //Address Resolution Protocol
-		 Serial.println("ARP Packet:");
-		 printpacket(p8, len - 2);
-		// if (p32[4] == 0x00080100 && p32[5] == 0x01000406) {
-		// 	// request is for IPv4 address of ethernet mac
-		// 	IPAddress from((p16[15] << 16) | p16[14]);
-		// 	IPAddress to(p32[10]);
-		// 	Serial.print("  Who is ");
-		// 	Serial.print(to);
-		// 	Serial.print(" from ");
-		// 	Serial.print(from);
-		// 	Serial.print(" (");
-		// 	printmac(p8 + 22);
-		// 	Serial.println(")");
-		// 	if (to == myaddress) {
-		// 		arp_reply(p8+22, from);
-		//	}
-		//}
 	}
 }
 
