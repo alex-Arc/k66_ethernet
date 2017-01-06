@@ -10,17 +10,23 @@ typedef struct S_EthernetHeader {
 
 typedef struct S_IPv4Header {
   //T_EthernetHeader  ethernetHeader;
-  uint8_t           Verion_IHL;          //bit 0-3: Version  bit 4-7: Internet Header Length (IHL)
-  uint8_t           DSCP_ECN;
-  uint16_t          totalLength;
-  uint16_t          ID;
-  uint16_t          Flags_FragmentOffset;
-  uint8_t           TTL;
-  uint8_t           protocol;
-  uint16_t          headerChecksum;
-  uint8_t           srcIP[4];
-  uint8_t           dstIP[4];
-  uint32_t          options[4];
+  struct {
+    uint8_t     IHL       : 4;
+    uint8_t     version   : 4;
+  }Version_IHL;
+  struct {
+    uint8_t     ECN       :2;
+    uint8_t     DSCP      :6;
+  }DSCP_ECN;
+  uint16_t    totalLength;
+  uint16_t    ID;
+  uint16_t    Flags_FragmentOffset;
+  uint8_t     TTL;
+  uint8_t     protocol;
+  uint16_t    headerChecksum;
+  uint8_t     srcIP[4];
+  uint8_t     dstIP[4];
+  uint32_t    options[4];
 } T_IPv4Header;
 
 typedef struct S_arp{
@@ -88,7 +94,7 @@ typedef struct {
   }moreflags;
 	uint16_t checksum;
 	uint8_t header;
-  uint8_t protocolType;
+  uint8_t protocolType :7;
 	uint32_t dmadone;
 	uint32_t timestamp;
 	uint32_t unused1;

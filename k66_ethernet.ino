@@ -138,12 +138,15 @@ void loop()
 	if (buf->flags.E == 0) {
     if (buf->flags.TR == 0) {
       Serial.println("--------------------------------------------");
-      Serial.println(buf->protocolType);
+      Serial.println(buf->protocolType, DEC);
+      Serial.println(buf->header>>2, DEC);
       Serial.println(buf->moreflags.all, BIN);
       if (buf->flags.L == 1) {
         if (buf->flags.MC == 1 || buf->flags.BC == 1 || buf->flags.M == 0) {
-          incoming(buf->buffer, buf->length, buf->flags.all);
-        }else{Serial.print("mac miss");}
+          if (buf->moreflags.ICE == 0) {
+            incoming(buf->buffer, buf->length, buf->flags.all);
+          }else{Serial.println("not IP frame or IP checksum error");}
+        }else{Serial.println("mac miss");}
       }else{Serial.println("can't handel multiframe right now");}
     }else{Serial.println("ERROR");}
 		if (rxnum < RXSIZE-1) {
@@ -194,32 +197,33 @@ void incoming(void *packet, unsigned int len, uint16_t flags)
         print("IPv4 \n");
         T_IPv4Header *IPv4Header;
         IPv4Header = (T_IPv4Header*)p8;
-        print("version: ", IPv4Header->Verion_IHL>>4);
-        print("\n len: ", IPv4Header->Verion_IHL & 0x0F);
-
+        print(" version: ", IPv4Header->Version_IHL.version);
+        print("\n header len: ", IPv4Header->Version_IHL.IHL);
+        print("\n DiffServ level: ", IPv4Header->DSCP_ECN.DSCP);
+        print("\n total length: ", __builtin_bswap16(IPv4Header->totalLength));
         print("\n srcIP = ", IPv4Header->srcIP[0]);
         print(".", IPv4Header->srcIP[1]);
         print(".", IPv4Header->srcIP[2]);
         print(".", IPv4Header->srcIP[3]);
         Serial.println();
 
-        print("dstIP = ", IPv4Header->dstIP[0]);
+        print(" dstIP = ", IPv4Header->dstIP[0]);
         print(".", IPv4Header->dstIP[1]);
         print(".", IPv4Header->dstIP[2]);
         print(".", IPv4Header->dstIP[3]);
         Serial.println();
 
         if(1 == 1) {
-          p8 = (const uint8_t*)IPv4Header + (IPv4Header->Verion_IHL & 0x0F)*4;
+          p8 = (const uint8_t*)IPv4Header + (IPv4Header->Version_IHL.IHL)*4;
           switch(IPv4Header->protocol) {
             case UDP:
               print("UDP \n");
               T_UDPHeader *UDPHeader;
               // p8 = (const uint8_t*)IPv4Header + (IPv4Header->Verion_IHL & 0x0F)*4;
               UDPHeader = (T_UDPHeader *)p8;
-              print("srcPort: ", __builtin_bswap16(UDPHeader->srcPort));
+              print(" srcPort: ", __builtin_bswap16(UDPHeader->srcPort));
               print("\n dstPort: ", __builtin_bswap16(UDPHeader->dstPort));
-              print("\n len: ", UDPHeader->length);
+              print("\n len: ", __builtin_bswap16(UDPHeader->length));
             break;
 
             default:
