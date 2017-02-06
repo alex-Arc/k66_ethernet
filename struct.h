@@ -94,7 +94,7 @@ typedef struct {
   }moreflags;
 	uint16_t checksum;
 	uint8_t header;
-  uint8_t protocolType :7;
+  uint8_t protocolType :4;
 	uint32_t dmadone;
 	uint32_t timestamp;
 	uint32_t unused1;

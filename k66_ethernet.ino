@@ -264,8 +264,8 @@ void loop()
 	if (buf->flags.E == 0) {
     if (buf->flags.TR == 0) {
       Serial.println("--------------------------------------------");
-      Serial.println(buf->protocolType, DEC);
-      Serial.println(buf->header>>2, DEC);
+      Serial.println(buf->protocolType, HEX);
+      Serial.println(buf->header, HEX);
       Serial.println(buf->moreflags.all, BIN);
       if (buf->flags.L == 1) {
         if (buf->flags.MC == 1 || buf->flags.BC == 1 || buf->flags.M == 0) {
