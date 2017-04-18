@@ -77,7 +77,7 @@ void begin() {
 
   for (int i=0; i < RXSIZE; i++) {
 		rx_ring[i].flags.all = 0x8000; // empty flag
-    rx_ring[i].moreflags.all = 0x80; // set Interrupt true
+    rx_ring[i].moreflags.all = 0x800000; // set Interrupt true
 		rx_ring[i].buffer = rxbufs + i * 128;
 	}
 	rx_ring[RXSIZE-1].flags.all = 0xA000; // empty & wrap flags
@@ -141,12 +141,12 @@ void setup()
 	begin();
 
   attachInterruptVector(IRQ_ENET_RX, rxIRQ);
-  NVIC_IS_ACTIVE(IRQ_ENET_RX);
+  // NVIC_IS_ACTIVE(IRQ_ENET_RX);
   NVIC_ENABLE_IRQ(IRQ_ENET_RX);
   //attachInterrupt(rxIRQ);
   __enable_irq();
   Serial.println();
-  printhex("NVIC_GET_PRIORITY: ", NVIC_GET_PRIORITY(IRQ_ENET_RX));
+  // printhex("NVIC_GET_PRIORITY: ", NVIC_GET_PRIORITY(IRQ_ENET_RX));
 	printhex("\n MDIO PHY ID2 (LAN8720A should be 0007): ", mdio_read(0, 2));
 	printhex("\n MDIO PHY ID3 (LAN8720A should be C0F?): ", mdio_read(0, 3));
 /*
@@ -314,7 +314,7 @@ void loop()
 			buf->flags.all = 0xA000;
 			rxnum = 0;
 		}
-    buf->flags.moreflags.all |= 0x80; // set Interrupt true;
+    // buf->flags.moreflags.all |= 0x800000; // set Interrupt true;
     Serial.println();
 	}
 	// TODO: if too many packets arrive too quickly, which is
