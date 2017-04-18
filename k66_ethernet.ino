@@ -77,7 +77,7 @@ void begin() {
 
   for (int i=0; i < RXSIZE; i++) {
 		rx_ring[i].flags.all = 0x8000; // empty flag
-    rx_ring[i].moreflags.INT = 1; // set Interrupt true
+    rx_ring[i].moreflags.all = 0x80; // set Interrupt true
 		rx_ring[i].buffer = rxbufs + i * 128;
 	}
 	rx_ring[RXSIZE-1].flags.all = 0xA000; // empty & wrap flags
@@ -314,7 +314,7 @@ void loop()
 			buf->flags.all = 0xA000;
 			rxnum = 0;
 		}
-    buf->moreflags.INT = 1;
+    buf->flags.moreflags.all |= 0x80; // set Interrupt true;
     Serial.println();
 	}
 	// TODO: if too many packets arrive too quickly, which is
