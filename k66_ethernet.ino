@@ -3,9 +3,10 @@
 #include "IPprotocol.h"
 #include "struct.h"
 #include "print.h"
+
 //static const int IPv4 = 0x0008;     //byte swap Internet Protocol version 4
 //static const int ARP = 0x0608;   //Address Resolution Protocol
-
+int interruptFlag = 0;
 // set this to an unused IP number for your network
 IPAddress myaddress(2, 2, 6, 10);
 uint8_t myaddress_byte[4] = {2,2,6,10};
@@ -76,15 +77,21 @@ void begin() {
 
   for (int i=0; i < RXSIZE; i++) {
 		rx_ring[i].flags.all = 0x8000; // empty flag
+    rx_ring[i].moreflags.INT = 1; // set Interrupt true
 		rx_ring[i].buffer = rxbufs + i * 128;
 	}
 	rx_ring[RXSIZE-1].flags.all = 0xA000; // empty & wrap flags
 	for (int i=0; i < TXSIZE; i++) {
 		tx_ring[i].buffer = txbufs + i * 128;
+    // tx_ring[i].moreflags.all = 0x80; // set Interrupt true
 	}
 	tx_ring[TXSIZE-1].flags.all = 0x2000; // wrap flag
 
-	ENET_EIMR = 0;
+  ENET_EIR = ENET_EIR_RXF; //clear Interrupt
+  ENET_EIR = ENET_EIR_RXB; //clear Interrupt
+  // ENET_EIR = ENET_EIR_MII;
+
+	ENET_EIMR = ENET_EIRM_RXF | ENET_EIRM_RXB;// | ENET_EIRM_MII;
 	ENET_MSCR = ENET_MSCR_MII_SPEED(15);  // 12 is fastest which seems to work
 	ENET_RCR = ENET_RCR_NLC | ENET_RCR_MAX_FL(1522) | ENET_RCR_CFEN |
 		ENET_RCR_CRCFWD | ENET_RCR_PADEN | ENET_RCR_RMII_MODE |
@@ -110,6 +117,19 @@ void begin() {
 	ENET_TDAR = ENET_TDAR_TDAR;
 }
 
+void rxIRQ(void){
+  Serial.println("........Interrupt........");
+  interruptFlag++;
+  ENET_EIR = ENET_EIR_RXF;
+  ENET_EIR = ENET_EIR_RXB;
+  // ENET_EIR = ENET_EIR_MII;
+}
+
+/*void attachInterrupt(void (*isr)(void)) {
+  _VectorsRam[IRQ_ENET_RX + 16] = isr;
+  NVIC_ENABLE_IRQ(IRQ_ENET_RX);
+}*/
+
 // initialize the ethernet hardware
 void setup()
 {
@@ -117,8 +137,16 @@ void setup()
 	while (!Serial) ; // wait
 	print("Ethernet Testing");
 	print("----------------\n");
+  __disable_irq();
 	begin();
 
+  attachInterruptVector(IRQ_ENET_RX, rxIRQ);
+  NVIC_IS_ACTIVE(IRQ_ENET_RX);
+  NVIC_ENABLE_IRQ(IRQ_ENET_RX);
+  //attachInterrupt(rxIRQ);
+  __enable_irq();
+  Serial.println();
+  printhex("NVIC_GET_PRIORITY: ", NVIC_GET_PRIORITY(IRQ_ENET_RX));
 	printhex("\n MDIO PHY ID2 (LAN8720A should be 0007): ", mdio_read(0, 2));
 	printhex("\n MDIO PHY ID3 (LAN8720A should be C0F?): ", mdio_read(0, 3));
 /*
@@ -129,6 +157,8 @@ void setup()
   Serial.print("Network prefix: ");
   prefix = myaddress & subNet;
   Serial.println(prefix);*/
+  //NVIC_TRIGGER_IRQ(IRQ_ENET_ERROR);
+
 }
 
 // compose an answer to ARP requests
@@ -262,11 +292,13 @@ void loop()
 
 
 	if (buf->flags.E == 0) {
+    printhex("interruptFlag: ", interruptFlag);
     if (buf->flags.TR == 0) {
       Serial.println("--------------------------------------------");
-      Serial.println(buf->protocolType, HEX);
-      Serial.println(buf->header, HEX);
-      Serial.println(buf->moreflags.all, BIN);
+      printhex("protocolType: ", buf->protocolType);
+      printhex("header: ", buf->header);
+      Serial.print("flags: ");
+      Serial.println(buf->moreflags.all, HEX);
       if (buf->flags.L == 1) {
         if (buf->flags.MC == 1 || buf->flags.BC == 1 || buf->flags.M == 0) {
           if (buf->moreflags.ICE == 0) {
@@ -282,6 +314,8 @@ void loop()
 			buf->flags.all = 0xA000;
 			rxnum = 0;
 		}
+    buf->moreflags.INT = 1;
+    Serial.println();
 	}
 	// TODO: if too many packets arrive too quickly, which is
 	// a distinct possibility when we spend so much time printing
