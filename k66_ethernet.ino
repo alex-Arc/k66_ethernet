@@ -13,11 +13,6 @@ uint8_t myaddress_byte[4] = {2,2,6,10};
 /*IPAddress subNet(255, 255, 255, 0);
 IPAddress prefix(0, 0, 0, 0);*/
 
-enum EtherType: uint16_t {
-  IPv4  = 0x0008,
-  ARP   = 0x0608
-};
-
 #define MACADDR1 0x04E9E5
 #define MACADDR2 0x000001
 
@@ -77,7 +72,7 @@ void begin() {
 
   for (int i=0; i < RXSIZE; i++) {
 		rx_ring[i].flags.all = 0x8000; // empty flag
-    rx_ring[i].moreflags.all = 0x800000; // set Interrupt true
+    rx_ring[i].moreflags.LSB = 0x80; // set Interrupt true
 		rx_ring[i].buffer = rxbufs + i * 128;
 	}
 	rx_ring[RXSIZE-1].flags.all = 0xA000; // empty & wrap flags
@@ -88,10 +83,10 @@ void begin() {
 	tx_ring[TXSIZE-1].flags.all = 0x2000; // wrap flag
 
   ENET_EIR = ENET_EIR_RXF; //clear Interrupt
-  ENET_EIR = ENET_EIR_RXB; //clear Interrupt
+  // ENET_EIR = ENET_EIR_RXB; //clear Interrupt
   // ENET_EIR = ENET_EIR_MII;
 
-	ENET_EIMR = ENET_EIRM_RXF | ENET_EIRM_RXB;// | ENET_EIRM_MII;
+	ENET_EIMR = ENET_EIRM_RXF;// | ENET_EIRM_RXB;// | ENET_EIRM_MII;
 	ENET_MSCR = ENET_MSCR_MII_SPEED(15);  // 12 is fastest which seems to work
 	ENET_RCR = ENET_RCR_NLC | ENET_RCR_MAX_FL(1522) | ENET_RCR_CFEN |
 		ENET_RCR_CRCFWD | ENET_RCR_PADEN | ENET_RCR_RMII_MODE |
@@ -117,12 +112,49 @@ void begin() {
 	ENET_TDAR = ENET_TDAR_TDAR;
 }
 
+volatile enetbufferdesc_t *buf;
+static int rxnum=0;
+
 void rxIRQ(void){
-  Serial.println("........Interrupt........");
   interruptFlag++;
+  printhex("........Interrupt........ ", interruptFlag);
+  buf = rx_ring + rxnum;
+  if ((buf->flags.all & 0xC000) == 0) {
+    if ((buf->flags.all & 0x80) != 0) {
+      Serial.println("broardcas.. conssider subnet mask");
+    }
+    if ((buf->moreflags.all & 0x610C00) == 0) {
+      //TODO: do a CRC
+      printdec("total Length: ", buf->length);
+      printhex("protocolType: ", buf->protocolType);
+      printdec("header: ", buf->header);
+      printhex("flag: ", buf->flags.all);
+      printhex("more flag: ", buf->moreflags.MSB);
+      printhex("more flag: ", buf->moreflags.LSB);
+      if ((buf->moreflags.MSB & 0x20) == 0x20) {
+        print("not IP or IP error\n");
+        ethernetHeader_t *buffer_prt = (ethernetHeader_t*)buf->buffer;
+
+        printhex("type: ", buffer_prt->type);
+      }
+
+          // incoming(buf->buffer, buf->length, buf->flags.all);
+    }else{
+      printhex("ERROR: ", buf->moreflags.all);
+    }
+  }else{
+    printhex("ERROR: ", buf->flags.all);
+  }
+	if (rxnum < RXSIZE-1) {
+		buf->flags.all = 0x8000;
+		rxnum++;
+	} else {
+		buf->flags.all = 0xA000;
+		rxnum = 0;
+  }
+  Serial.println("");
   ENET_EIR = ENET_EIR_RXF;
-  ENET_EIR = ENET_EIR_RXB;
-  // ENET_EIR = ENET_EIR_MII;
+  // ENET_EIR = ENET_EIR_RXB;
 }
 
 /*void attachInterrupt(void (*isr)(void)) {
@@ -279,17 +311,15 @@ void mdio_write(int phyaddr, int regaddr, uint16_t data)
 	ENET_EIR = ENET_EIRM_MII;
 	//print("mdio write waited ", count);
 	//printhex("mdio write :", data);
+
 }
 
 
 // watch for data to arrive
 void loop()
 {
-	static int rxnum=0;
-	volatile enetbufferdesc_t *buf;
 
-	buf = rx_ring + rxnum;
-
+/*
 
 	if (buf->flags.E == 0) {
     printhex("interruptFlag: ", interruptFlag);
@@ -317,6 +347,7 @@ void loop()
     // buf->flags.moreflags.all |= 0x800000; // set Interrupt true;
     Serial.println();
 	}
+  */
 	// TODO: if too many packets arrive too quickly, which is
 	// a distinct possibility when we spend so much time printing
 	// to the serial monitor, ENET_RDAR_RDAR can be cleared if
