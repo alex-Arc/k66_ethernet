@@ -1,6 +1,30 @@
 #ifndef struct_h
 #define struct_h
 
+enum EtherType: uint16_t {
+  IPv4  = 0x0008,
+  ARP   = 0x0608
+};
+
+typedef struct ethernetHeader_s {
+  uint16_t   pad;
+  uint8_t   dstMAC[6];
+  uint8_t   srcMAC[6];
+  uint16_t  type;
+} ethernetHeader_t;
+
+typedef struct arp_s{
+  uint16_t  HTYPE;    //Hardware type
+  uint16_t  PTYPE;    //Protocol type
+  uint8_t   HLEN;     //Hardware length. lenght hardware address is 6
+  uint8_t   PLEN;     //Protocol length. length of IPv4 addr is 4
+  uint16_t  OPER;     //Operation 1 for request, 2 for reply
+  uint8_t   SHA[6];   //sender hardware address (MAC)
+  uint8_t   SPA[4];   //Sender protocol address (IP)
+  uint8_t   THA[6];    //Target hardware address (MAC)
+  uint8_t   TPA[4];    //Target protocol address (IP)
+}arp_t;
+
 typedef struct S_EthernetHeader {
   uint16_t   pad;
   uint8_t   dstMAC[6];
@@ -80,7 +104,7 @@ typedef struct {
   }moreflags;
 	uint16_t checksum;
 	uint8_t header;
-  uint8_t protocolType :4;
+  uint8_t protocolType;
 	uint32_t dmadone;
 	uint32_t timestamp;
 	uint32_t unused1;
