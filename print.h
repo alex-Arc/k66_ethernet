@@ -13,6 +13,18 @@ void print(const char *s, int num)
 	Serial.print(num);
 }
 
+void printbin(const char *s, int num)
+{
+	Serial.print(s);
+	Serial.println(num,BIN);
+}
+
+void printdec(const char *s, int num)
+{
+	Serial.print(s);
+	Serial.println(num,DEC);
+}
+
 void printhex(const char *s, int num)
 {
 	Serial.print(s);
