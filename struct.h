@@ -74,22 +74,8 @@ typedef struct {
   union {
     uint32_t all;
     struct {
-      uint8_t Reserved0  : 7;
-      uint8_t INT   : 1;
-      uint8_t UC    : 1;        //unicast frame
-      uint8_t CE    : 1;        //Collision error The frame is invalid. Only valid if the L field is set.
-      uint8_t PE    : 1;        //PHY error The frame is invalid. Only valid if the L field is set.
-      uint8_t Reserved1  : 4;
-      uint8_t ME    : 1;        //Erroe in memory or receive FIFO overflow. Only valid if the L field is set.
-      uint8_t FRAG  : 1;        //This is a IPv4 fragment frame. Only valid if the L field is set.
-      uint8_t IPV6  : 1;        //IPV6 tag. Only valid if the L field is set.
-      uint8_t VLAN  : 1;        //VLAN tag. Only valid if the L field is set.
-      uint8_t Reserved2  : 1;
-      uint8_t PCR  : 1;         //Protocol checksum error. Only valid if the L field is set.
-      uint8_t ICE  : 1;         //IP header checksum error. Only valid if the L field is set.
-      uint8_t Reserved3  : 2;
-      uint8_t Reserved4  : 5;
-      uint8_t VPCP : 3;         //VLAN priority code 0-7
+      uint16_t MSB;
+      uint16_t LSB;
     };
   }moreflags;
 	uint16_t checksum;
