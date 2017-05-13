@@ -112,18 +112,19 @@ void begin() {
 	ENET_TDAR = ENET_TDAR_TDAR;
 }
 
-volatile enetbufferdesc_t *buf;
+
 static int rxnum=0;
 
 void rxIRQ(void){
   interruptFlag++;
   printhex("........Interrupt........ ", interruptFlag);
+  volatile enetbufferdesc_t *buf;
   buf = rx_ring + rxnum;
   if ((buf->flags.all & 0xC000) == 0) {
     if ((buf->flags.all & 0x80) != 0) {
       Serial.println("broardcas.. conssider subnet mask");
     }
-    if ((buf->moreflags.all & 0x610C00) == 0) {
+    if ((buf->moreflags.LSB & 0x8600) == 0) {
       //TODO: do a CRC
       printdec("total Length: ", buf->length);
       printhex("protocolType: ", buf->protocolType);
@@ -132,10 +133,51 @@ void rxIRQ(void){
       printhex("more flag: ", buf->moreflags.MSB);
       printhex("more flag: ", buf->moreflags.LSB);
       if ((buf->moreflags.MSB & 0x20) == 0x20) {
-        print("not IP or IP error\n");
-        ethernetHeader_t *buffer_prt = (ethernetHeader_t*)buf->buffer;
+        print("not IPv4 or IPv4 error\n");
+        uint8_t *prt = (uint8_t*)buf->buffer;
+        ethernetHeader_t *ethernetHeader = (ethernetHeader_t*)prt;
+        prt = prt + sizeof(ethernetHeader_t);
+        if(ethernetHeader->type == EtherType::ARP) {
+          print("EtherType: ARP \n");
+          arpHeader_t *arpHeader = (arpHeader_t*)prt;
+          if(arpHeader->OPER == 0x100) {
+            print("Who is: ");
+            printip(arpHeader->TPA);
+            print("Tell: ");
+            printip(arpHeader->SPA);
+            if(memcmp(arpHeader->TPA, myaddress_byte, 4) == 0) {
+              print("i am, sending reply \n");
+              arp_reply(arpHeader->SHA, arpHeader->SPA);
+            }else{
+              print("not to me\n");
+            }
+          }else if(arpHeader->OPER == 0x200) {
+            print("reply....\n");
+          }else{
+            print("unknown Operation\n");
+          }
+        }else if(ethernetHeader->type == EtherType::IPv4) {
+          print("IPv4 error\n");
+        }else{
+          printhex("unknown EtherType: ", ethernetHeader->type);
+        }
+      }else{
+        print("...IPv4...\n");
+        uint8_t *prt = (uint8_t*)buf->buffer;
+        ethernetHeader_t *ethernetHeader = (ethernetHeader_t*)prt;
+        prt = prt+sizeof(ethernetHeader_t);
+        if (ethernetHeader->type == EtherType::IPv4) {
+          IPv4Header_t *IPv4Header = (IPv4Header_t*)prt;
+          prt = prt + IPv4Header->Version_IHL.IHL;
+          if (IPv4Header->protocol == IpProtocol::ICMP) {
+            icmpHeader_t * icmpHeader = (icmpHeader_t*)prt;
+            prt = prt + sizeof(icmpHeader_t);
+            if (icmpHeader->type == icmpTypeCode::echoRequest) {
 
-        printhex("type: ", buffer_prt->type);
+
+            }
+          }
+        }
       }
 
           // incoming(buf->buffer, buf->length, buf->flags.all);
@@ -213,6 +255,7 @@ void arp_reply(const uint8_t *mac, const uint8_t *ip) {
 
 	outgoing_pre(packet, sizeof(T_arp), mac, EtherType::ARP);
 }
+
 void outgoing_pre(void *packet, unsigned int len, const uint8_t* dstMAC, uint16_t EtherType) {
 
 	static int txnum=0;
