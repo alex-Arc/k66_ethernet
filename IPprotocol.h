@@ -1,14 +1,25 @@
 #ifndef __IPprotocol_h__
 #define __IPprotocol_h__
 
+enum IpProtocol: uint8_t {
+  ICMP  = 0x01,
+  IGMP  = 0x02,
+  TCP   = 0x06,
+  UDP   = 0x11,
+};
 
+enum icmpTypeCode: uint16_t {
+  echoReply = 0x0,
+  echoRequest = 0x800,
+};
+
+#define   ICMP 0x01  //Internet Control Message Protocol RFC 792
+#define   IGMP 0x02  //Internet Group Management Protocol  RFC 1112
 #define   UDP 0x11   //User Datagram Protocol  RFC 768
 #define   TCP 0x06   //Transmission Control Protocol RFC 793
 
 /*
 0  0x00  HOPOPT  IPv6 Hop-by-Hop Option  RFC 2460
-1 0x01  ICMP  Internet Control Message Protocol RFC 792
-2 0x02  IGMP  Internet Group Management Protocol  RFC 1112
 3 0x03  GGP Gateway-to-Gateway Protocol RFC 823
 4 0x04  IP-in-IP  IP in IP (encapsulation)  RFC 2003
 5 0x05  ST  Internet Stream Protocol  RFC 1190, RFC 1819
