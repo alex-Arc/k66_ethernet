@@ -37,6 +37,12 @@ void printmac(const uint8_t *data)
 		data[0], data[1], data[2], data[3], data[4], data[5]);
 }
 
+void printip(const uint8_t *data)
+{
+	Serial.printf("%u.%u.%u.%u \n",
+		data[0], data[1], data[2], data[3], data[4], data[5]);
+}
+
 void printpacket(const uint8_t *data, unsigned int len)
 {
 #if 1
