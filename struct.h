@@ -13,7 +13,34 @@ typedef struct ethernetHeader_s {
   uint16_t  type;
 } ethernetHeader_t;
 
-typedef struct arp_s{
+typedef struct IPv4Header_s {
+  //T_EthernetHeader  ethernetHeader;
+  struct {
+    uint8_t     IHL       : 4;
+    uint8_t     version   : 4;
+  }Version_IHL;
+  struct {
+    uint8_t     ECN       :2;
+    uint8_t     DSCP      :6;
+  }DSCP_ECN;
+  uint16_t    totalLength;
+  uint16_t    ID;
+  uint16_t    Flags_FragmentOffset;
+  uint8_t     TTL;
+  uint8_t     protocol;
+  uint16_t    headerChecksum;
+  uint8_t     srcIP[4];
+  uint8_t     dstIP[4];
+  uint32_t    options[4];
+} IPv4Header_t;
+
+typedef struct icmpHeader_s {
+  uint8_t type;
+  uint8_t code;
+  uint16_t checksum;
+}icmpHeader_t;
+
+typedef struct arpHeader_s{
   uint16_t  HTYPE;    //Hardware type
   uint16_t  PTYPE;    //Protocol type
   uint8_t   HLEN;     //Hardware length. lenght hardware address is 6
@@ -23,7 +50,7 @@ typedef struct arp_s{
   uint8_t   SPA[4];   //Sender protocol address (IP)
   uint8_t   THA[6];    //Target hardware address (MAC)
   uint8_t   TPA[4];    //Target protocol address (IP)
-}arp_t;
+}arpHeader_t;
 
 typedef struct S_EthernetHeader {
   uint16_t   pad;
