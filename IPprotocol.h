@@ -1,6 +1,8 @@
 #ifndef __IPprotocol_h__
 #define __IPprotocol_h__
 
+uint8_t IP_Broadcast_address[4] = {255, 255, 255, 255};
+
 enum IpProtocol: uint8_t {
   ICMP  = 0x01,
   IGMP  = 0x02,

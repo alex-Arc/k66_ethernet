@@ -15,14 +15,8 @@ typedef struct ethernetHeader_s {
 
 typedef struct IPv4Header_s {
   //T_EthernetHeader  ethernetHeader;
-  struct {
-    uint8_t     IHL       : 4;
-    uint8_t     version   : 4;
-  }Version_IHL;
-  struct {
-    uint8_t     ECN       :2;
-    uint8_t     DSCP      :6;
-  }DSCP_ECN;
+  uint8_t     Version_IHL;
+  uint8_t     DSCP_ECN;
   uint16_t    totalLength;
   uint16_t    ID;
   uint16_t    Flags_FragmentOffset;
@@ -31,7 +25,7 @@ typedef struct IPv4Header_s {
   uint16_t    headerChecksum;
   uint8_t     srcIP[4];
   uint8_t     dstIP[4];
-  uint32_t    options[4];
+//  uint32_t    options[4];
 } IPv4Header_t;
 
 typedef struct icmpHeader_s {
