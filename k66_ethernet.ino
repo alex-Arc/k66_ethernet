@@ -1,19 +1,30 @@
 #include "k66ethernet.h"
 
+//#include "print.h"
+
+k66ethernet enet = k66ethernet();
+
 // initialize the ethernet hardware
 void setup()
 {
   Serial.begin(9600);
 	while (!Serial) ; // wait
-	print("Ethernet Testing");
-	print("----------------\n");
-
-	begin();
-
+	Serial.print("Ethernet Testing");
+	Serial.print("----------------\n");
+  uint8_t myIP[4] = {2,0,0,2};
+	enet.begin();
+  enet.setIP(myIP);
+  delay(100);
   Serial.println();
+  uint8_t dstIP[4] = {255,255,255,255};
 
-	printhex("\n MDIO PHY ID2 (LAN8720A should be 0007): ", mdio_read(0, 2));
-	printhex("\n MDIO PHY ID3 (LAN8720A should be C0F?): ", mdio_read(0, 3));
+  enet.beginIPv4Packet(dstIP, 0x11);
+  enet.endPacket();
+uint8_t dstIP1[4] = {2,0,0,1};
+uint8_t dstMAC[6] = {0,0,0,0,0,0};
+  enet.sendArp(dstIP1, dstMAC, 1);
+	//printhex("\n MDIO PHY ID2 (LAN8720A should be 0007): ", enet.mdio_read(0, 2));
+	//printhex("\n MDIO PHY ID3 (LAN8720A should be C0F?): ", enet.mdio_read(0, 3));
 /*
   Serial.print("my IP: ");
   Serial.println(myaddress);
